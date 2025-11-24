@@ -1,0 +1,6 @@
+aiogram==2.25.1
+asyncio>=3.4.3
+sqlalchemy>=1.4.46
+psycopg2-binary>=2.9.3
+aioredis>=2.0.1
+dotenv>=0.15.0

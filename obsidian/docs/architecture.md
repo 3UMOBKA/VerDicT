@@ -1,0 +1,125 @@
+  - Описание общей архитектуры приложения.
+  - Структура базы данных и схемы таблиц.
+  - Принципы взаимодействия компонентов.
+
+English_bot/
+    app.py
+    alembic.ini
+    zalp.py
+    local_database.db
+    .$Models_DB.drawio.bkp
+    Models_DB.drawio
+    newfile.py
+    .env
+    requirements.txt
+    bot_core/
+        main.py
+        middlewares.py
+        system_commands.py
+        handlers.py
+        __pycache__/
+            base_classes.cpython-310.pyc
+            middlewares.cpython-313.pyc
+            handlers.cpython-310.pyc
+            handlers.cpython-313.pyc
+            system_commands.cpython-310.pyc
+    cache_system/
+        cache_manager.py
+        redis_config.py
+    exam/
+    parsers/
+        ParserLessons.session
+        grammar_parser.py
+        lesson_parser.py
+        my_account.session
+        words_parser.py
+    __pycache__/
+        app.cpython-310.pyc
+        env.cpython-313.pyc
+    obsidian/
+        English_bot/
+            концепт метрик.md
+            WIP функционал.md
+            README.md
+            .obsidian/
+                workspace.json
+                core-plugins.json
+                graph.json
+                app.json
+                appearance.json
+            docs/
+                developer_guide.md
+                changelog.md
+                api_reference.md
+                testing_ci_cd.md
+                usage_examples.md
+                faq.md
+                metrics_and_personalization.md
+                architecture.md
+                Модули/
+                Уроки/
+                    Урок 1. Базовая форма глагола.md
+                База данных/
+    lessons/
+        chooselessons.py
+        temp
+        __pycache__/
+            chooselessons.cpython-310.pyc
+            LessonsPresentary.cpython-310.pyc
+    .vscode/
+        settings.json
+    db_layer/
+        models.py
+        __init__.py
+        repository.py
+        __pycache__/
+            repository.cpython-310.pyc
+            repository.cpython-313.pyc
+            __init__.cpython-313.pyc
+            models.cpython-310.pyc
+            models.cpython-313.pyc
+            __init__.cpython-310.pyc
+        migrations/
+            README
+            script.py.mako
+            env.py
+            __pycache__/
+                env.cpython-313.pyc
+                env.cpython-310.pyc
+            versions/
+                7ec68bb5a295_create_initial_tables.py
+                e3fc1a6ca15a_create_initial_tables.py
+                215e9b3fdeee_create_initial_tables.py
+                bda067ca98ac_initial_migration.py
+                
+                d10c0db4d0ee_manual_migration.py
+                2a5e6c7a2382_create_initial_tables.py
+                97104123f60d_create_initial_tables.py
+                __pycache__/
+                    73c6b98379e6_create_initial_tables.cpython-310.pyc
+                    3ebf8f68486a_create_initial_tables.cpython-310.pyc
+                    97104123f60d_create_initial_tables.cpython-310.pyc
+2c600894bb8e_create_initial_tables.cpython-310.pyc
+    xml/
+        mix_lesson12_dictionary.xml
+    user_services/
+        user_service.py
+    data/
+    learning_modules/
+        flashcards.py
+        grammar.py
+        synonyms.py
+        words.py
+        __pycache__/
+            grammarlearner.cpython-310.pyc
+            flashcards.cpython-313.pyc
+            wordlearners.cpython-310.pyc
+            grammar.cpython-310.pyc
+            words.cpython-310.pyc
+            synonyms.cpython-313.pyc
+            synonyms.cpython-310.pyc
+            flashcards.cpython-310.pyc
+            wordlearners.cpython-313.pyc
+            translation_offer.cpython-310.pyc
+    logging/
+        logging_config.py

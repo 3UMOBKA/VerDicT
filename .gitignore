@@ -1,0 +1,39 @@
+# Игнорируем виртуальное окружение
+venv/
+.__pycache__
+
+# Конфигурационные файлы окружения
+.env*
+
+# Файлы баз данных SQLite
+*.db
+
+# Локальные конфигурации редактора
+.vscode/*
+!.vscode/settings.json # сохраняем настройки VSCode, если надо
+
+# Кэшированные байт-кодовые файлы Python
+**.pyc
+__pycache__/
+
+# Директории алембик миграция
+migrations/*.pyc
+migrations/pycache/
+
+# Временные файлы draw.io
+.*.drawio.*
+
+# XML-кэши и парсеры сессий
+parsers/*session
+xml/mix_lesson*dictionary.xml
+
+# Папка с временными файлами
+temp/
+
+# Кэш-папки модулей
+bot_core/pycache/
+learning_modules/pycache/
+db_layer/pycache/
+
+# Лог-конфиг для конкретного сервера
+logging/logging_config.py

@@ -19,7 +19,7 @@ __pycache__/
 # Директории алембик миграция
 migrations/*.pyc
 migrations/pycache/
-
+.obsidian/
 xml/
 zalp.py
 parsers/

@@ -3,16 +3,63 @@ import random
 import re
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.types import Message, CallbackQuery
-from db_layer.repository import next_sentence, get_random_words
+from db_layer.repository import get_sentences_by_lesson, next_sentence, get_random_words
 
 
 class GrammarLearner:
     def __init__(self):
         self.current_sentence = None
-        self.translation = ""
-        self.word_position = 0
+        self.user_translation = []  # Накопленное предложение пользователя
         self.translation_direction = None
         self.options = None
+        self.total_words_count = 0  # Всего слов в предложении
+        self.completed_words = 0  # Кол-во выбранных слов
+        self.mode = ""  # Режим игры (default, lesson:<id>, exam:<level>)
+
+    def normalize_answer(self, answer: str) -> str:
+        """
+        Приведение строки к единому виду: удаление знаков препинания и преобразование в нижний регистр.
+        """
+        cleaned_answer = ''.join(char for char in answer if char.isalnum() or char.isspace()).strip().lower()
+        return cleaned_answer
+
+    def generate_options(self) -> List[str]:
+        """
+        Формирует четыре варианта ответов: один правильный и три неправильных.
+        """
+        # Выбор правильного ответа
+        correct_answer = self.current_sentence.translation_en.split()[self.completed_words]
+        normalized_correct_answer = self.normalize_answer(correct_answer)
+
+        # Получение случайных неправильных слов
+        wrong_words = get_random_words(count=10, exclude_word_id=self.current_sentence.id)
+        wrong_words_filtered = [
+            word for word in wrong_words
+            if word.english_word != correct_answer
+        ][:3]  # Используем максимум три уникальных неправильных слова
+
+        # Преобразуем неправильные ответы в общий формат
+        wrong_answers_normalized = [self.normalize_answer(word.english_word) for word in wrong_words_filtered]
+
+        # Объединяем правильный и неправильные варианты
+        options = [normalized_correct_answer] + wrong_answers_normalized
+        random.shuffle(options)  # Перемешиваем варианты
+        return options[:4]  # Возврат первых четырех элементов
+
+    def create_keyboard(self, options: List[str]) -> InlineKeyboardMarkup:
+        """
+        Создание клавиатуры с вариантами ответов.
+        """
+        buttons = []
+        row_size = 2  # Количество столбцов
+        for i in range(0, len(options), row_size):
+            row_buttons = []
+            for j in range(i, min(i+row_size, len(options))):
+                button = InlineKeyboardButton(text=options[j], callback_data=f'gw_{j}')
+                row_buttons.append(button)
+            buttons.append(row_buttons)
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        return keyboard
 
     def find_errors(self, user_translation: str, correct_translation: str) -> str:
         """
@@ -33,216 +80,183 @@ class GrammarLearner:
     
         return '\n'.join(errors) if errors else "Нет ошибок!"
 
-
-
-
-    def normalize_answer(self, answer: str) -> str:
+    async def load_next_question(self, message: Message):
         """
-        Приведение строки к единому виду: удаление знаков препинания и приведение к нижнему регистру.
+        Загрузка следующего вопроса независимо от режима.
         """
-        cleaned_answer = ''.join(char for char in answer if char.isalnum() or char.isspace()).strip().lower()
-        return cleaned_answer
+        # Получаем следующее предложение
+        if self.mode.startswith("lesson:"):
+            # Учебный режим: берем предложение из указанного урока
+            lesson_id = int(self.mode.split(":")[1])
+            self.current_sentence = get_sentences_by_lesson(self, lesson_id)
+        else:
+            # Обычный или экзаменационный режим: получаем любое предложение
+            self.current_sentence = next_sentence(self)
 
-    def check_answer(self, user_answer: str) -> bool:
-        """
-        Проверяет правильность выбранного слова.
-        """
-        target_word = self.current_sentence.translation_en.split()[self.word_position]
-        normalized_answer = self.normalize_answer(user_answer)
-        normalized_target = self.normalize_answer(target_word)
-        return normalized_answer == normalized_target
+        if self.current_sentence:
+            self.total_words_count = len(self.current_sentence.translation_en.split())  # Всего слов в переводе
+            self.user_translation = []  # Очищаем накопленный перевод
+            self.completed_words = 0  # Счётчик переведённых слов
+            self.options = self.generate_options()  # Первоначальные варианты ответов
 
-    def generate_options(self) -> List[str]:
-        """
-        Формирует четыре варианта ответов: один правильный и три неправильных.
-        """
-        # Определяем правильный ответ
-        correct_answer = self.current_sentence.translation_en.split()[self.word_position]
-        normalized_correct_answer = self.normalize_answer(correct_answer)
-
-        # Получаем три случайных слова из базы данных, исключая правильный ответ
-        all_words = get_random_words(count=10)  # Забираем побольше слов, чтобы выбрать уникальные
-        wrong_words = [
-            word for word in all_words
-            if word.english_word != correct_answer and word.id != self.current_sentence.id
-        ]
-        wrong_words = random.sample(wrong_words, k=min(3, len(wrong_words)))  # Ограничиваем количество неправильных вариантов
-
-        # Приводим неправильные ответы к единому формату
-        wrong_answers_normalized = [self.normalize_answer(word.english_word) for word in wrong_words]
-
-        # Объединяем правильный и неправильные варианты
-        options = [normalized_correct_answer] + wrong_answers_normalized
-        random.shuffle(options)
-        return options[:4]
-
-
-
-    def create_keyboard(self, options: list):
-        """
-        Создание клавиатуры с вариантами ответов.
-        """
-        buttons = []
-        row_size = 2  # Размер ряда кнопок
-        for i in range(0, len(options), row_size):
-            row_buttons = []
-            for j in range(i, min(i+row_size, len(options))):
-                button = InlineKeyboardButton(text=options[j], callback_data=f'gw_{j}')
-                row_buttons.append(button)
-            buttons.append(row_buttons)
-        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-        return keyboard
-
-    def get_current_task(self) -> Optional[Tuple]:
-        """
-        Возвращает текущее задание или None, если предложений больше нет.
-        """
-        if self.current_sentence is None:
-            success = self.next_sentence()
-            if not success:
-                return None
-        self.options = self.generate_options()
-        return self.current_sentence, self.options, self.translation_direction
-
-    def reset_game(self):
-        """
-        Сброс состояния игры.
-        """
-        self.current_sentence = None
-        self.translation = ""
-        self.word_position = 0
-        self.translation_direction = None
-        self.options = None
-
-    async def start_game(self, message: Message) -> None:
-        """
-        Запускает модуль GrammarLearner
-        """
-        self.reset_game()
-        task = self.get_current_task()
-        if task is None:
-            await message.answer("Нет предложений для изучения.")
-            return
-    
-        sentence, options, direction = task
-        keyboard = self.create_keyboard(options)
-        await message.answer(
-            f"Переведите предложение:\n{sentence.text_ru}",
-            reply_markup=keyboard,
-            parse_mode="HTML",
-        )
+            # Первая итерация: показываем клавиатуру
+            keyboard = self.create_keyboard(self.options)
+            await message.answer(
+                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
+                f"Выбирайте следующую часть перевода:",
+                reply_markup=keyboard,
+                parse_mode="MarkdownV2"
+            )
+        else:
+            await message.answer("Нет предложений для перевода.")
 
     async def handle_callback(self, query: CallbackQuery):
-        """Обрабатывает Callbacks GrammarLearner"""
-        parts = query.data.split("_")
-        if len(parts) != 2 or parts[0] != "gw":
-            raise ValueError("Некорректный формат callback'a.")
+        """
+        Обработчик нажатий на inline-кнопки.
+        """
+        data_parts = query.data.split('_')
+        if len(data_parts) != 2 or data_parts[0] != 'gw':
+            raise ValueError('Некорректный формат callback-data.')
 
-        option_idx = int(parts[1])
+        option_idx = int(data_parts[1])
 
-        # Проверяем существование текущего предложения
-        if not self.current_sentence:
-            await query.message.answer("Нет активного предложения для перевода.")
-            return
+        # Получаем выбранный вариант ответа
+        chosen_option = self.options[option_idx]
+        print(f"Selected Option: {chosen_option}, Current Translation: {' '.join(self.user_translation)}")  # Диагностика
 
-        # Генерируем новые варианты ответов
-        current_options = self.generate_options()
-        if not current_options:
-            await query.message.answer("Не удалось создать варианты ответов.")
-            return
+        # Добавляем выбранное слово в перевод
+        self.user_translation.append(chosen_option)
+        self.completed_words += 1
 
-        # Получаем индекс правильного ответа
-        try:
-            correct_answer_index = current_options.index(self.normalize_answer(self.current_sentence.translation_en.split()[self.word_position]))
-        except IndexError:
-            await query.message.answer("Ошибка в формировании вариантов ответов.")
-            return
-
-        # Проверяем, соответствует ли выбранный ответ правильному
-        is_correct = option_idx == correct_answer_index
-
-        # Обновляем перевод, учитывая выбор пользователя
-        selected_answer = current_options[option_idx]
-        self.translation += f"{selected_answer} "
-
-        # Переходим к следующему слову
-        self.word_position += 1
-        expected_length = len(self.current_sentence.translation_en.split())
-
-        if self.word_position >= expected_length:
-            # Завершаем игру и показываем результат
-            final_translation = self.translation.strip()
-            original_sentence = self.current_sentence.text_ru
-            translated_sentence = self.current_sentence.translation_en
-            errors = self.find_errors(final_translation, translated_sentence)
+        # Обновляем клавиатуру или показываем результат
+        if self.completed_words < self.total_words_count:
+            # Ещё не выбрали все слова
+            self.options = self.generate_options()  # Новые варианты для следующего слова
+            keyboard = self.create_keyboard(self.options)
+            await query.message.edit_text(
+                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
+                f"Продолжайте выбирать!",
+                reply_markup=keyboard,
+                parse_mode="MarkdownV2"
+            )
+        else:
+            # Все слова выбраны, проверяем перевод
+            final_translation = ' '.join(self.user_translation).strip()
+            errors = self.find_errors(final_translation, self.current_sentence.translation_en)
 
             result_message = (
-                f"<b>Исходное предложение:</b>\\n{original_sentence}\\n\\n"
-                f"<b>Ваш перевод:</b>\\n{final_translation}\\n\\n"
-                f"<b>Правильный перевод:</b>\\n{translated_sentence}\\n\\n"
-                f"<b>Список ошибок:</b>\\n{errors}"
+                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                f"Ваш перевод: `{final_translation}`\n\n"
+                f"Правильный перевод: `{self.current_sentence.translation_en}`\n\n"
+                f"Результат: {errors}"
             )
-            await query.message.answer(result_message, parse_mode="HTML")
-            self.reset_game()
-        else:
-            new_task = self.get_current_task()
-            if new_task:
-                sentence, _, _ = new_task
-                # Создаем новую клавиатуру с новыми вариантами
-                options = self.generate_options()
-                keyboard = self.create_keyboard(options)
-                await query.message.edit_text(
-                    f"Ваш перевод: {self.translation}\\nПереводите фразу '{sentence.text_ru}'",
-                    reply_markup=keyboard,
-                    parse_mode="HTML",
-                )
+            await query.message.answer(result_message, parse_mode="MarkdownV2")
 
-
+            # Дальше грузим следующее задание или останавливаемся
+            if self.mode.startswith("exam"):
+                # Экзаменационный режим — останов после завершения задания
+                self.current_sentence = None
+                self.user_translation.clear()
+                self.completed_words = 0
+                self.options = None
+            else:
+                # Обычный или учебный режим — начинаем следующее задание
+                await self.load_next_question(query.message)
     async def start_default_mode(self, message: Message):
-        # Начало игры в обычном режиме
+        """
+        Стандартный режим игры.
+        """
         await message.answer("Начало стандартного режима.", reply_markup=ReplyKeyboardRemove())
-
-        # Запрашиваем первое предложение
-        sentence = next_sentence(self)
-        if sentence:
-            # Генератор вариантов ответов
-            options = self.generate_options()
-            keyboard = self.create_keyboard(options)
-
-            # Отправляем вопрос и клавиатуру
-            await message.answer(sentence.text_ru, reply_markup=keyboard)
-        else:
-            await message.answer("Нет больше предложений для перевода.")
-
+        self.mode = "default"
+        await self.load_next_question(message)
 
     async def start_lesson_mode(self, message: Message, lesson_id: int):
-        # Начинаем обучение по выбранному уроку
-        await message.answer(f"Обучение началось по уроку №{lesson_id}.", reply_markup=ReplyKeyboardRemove())
-
-        # Загружаем следующее предложение
-        sentence = next_sentence(self)
-        if sentence:
-            # Подготавливаем список вариантов ответов
-            options = self.generate_options()
-            keyboard = self.create_keyboard(options)
-
-            # Отсылаем задание игроку
-            await message.answer(sentence.text_ru, reply_markup=keyboard)
-        else:
-            await message.answer("Больше предложений нет.")
+        """
+        Учебный режим с фокусом на конкретные уроки.
+        """
+        await message.answer(f"Начало учебного режима по уроку №{lesson_id}.", reply_markup=ReplyKeyboardRemove())
+        self.mode = f"lesson:{lesson_id}"  # Добавляем номер урока в режим
+        await self.load_next_question(message)
 
     async def start_exam_mode(self, message: Message, exam_level: int):
-        # Экзаменационная сессия началась
-        await message.answer(f"Экзамен начался на уровне {exam_level}.", reply_markup=ReplyKeyboardRemove())
+        """
+        Экзаменационный режим с повышенной нагрузкой.
+        """
+        await message.answer(f"Начало экзаменационного режима на уровне {exam_level}.", reply_markup=ReplyKeyboardRemove())
+        self.mode = f"exam:{exam_level}"  # Добавляем уровень экзамена в режим
+        await self.load_next_question(message)
 
-        # Первое предложение для экзаменуемого
-        sentence = next_sentence(self)
-        if sentence:
-            # Готовим кнопки с возможными ответами
-            options = self.generate_options()
-            keyboard = self.create_keyboard(options)
+    async def load_next_question(self, message: Message):
+        """
+        Загрузка следующего вопроса независимо от режима.
+        """
+        # Получаем следующее предложение
+        self.current_sentence = next_sentence(self)
+        if self.current_sentence:
+            self.total_words_count = len(self.current_sentence.translation_en.split())  # Всего слов в переводе
+            self.user_translation = []  # Очищаем накопленный перевод
+            self.completed_words = 0  # Счётчик переведённых слов
+            self.options = self.generate_options()  # Первоначальные варианты ответов
 
-            # Выдача задания на проверку
-            await message.answer(sentence.text_ru, reply_markup=keyboard)
+            # Первая итерация: показываем клавиатуру
+            keyboard = self.create_keyboard(self.options)
+            await message.answer(
+                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
+                f"Выбирайте следующую часть перевода:",
+                reply_markup=keyboard,
+                parse_mode="MarkdownV2"
+            )
         else:
-            await message.answer("Экзаменационные вопросы исчерпаны.")
+            await message.answer("Нет предложений для перевода.")
+
+    def escape_md_v2(text: str) -> str:
+        special_chars = r'_*\[]()~`>#+-={}|.!'
+        for ch in special_chars:
+            text = text.replace(ch, f'\\{ch}')
+        return text
+    async def handle_callback(self, query: CallbackQuery):
+        data_parts = query.data.split('_')
+        if len(data_parts) != 2 or data_parts[0] != 'gw':
+            raise ValueError('Некорректный формат callback-data.')
+
+        option_idx = int(data_parts[1])
+
+        # Получаем выбранный вариант ответа
+        chosen_option = self.options[option_idx]
+        print(f"Selected Option: {chosen_option}, Current Translation: {' '.join(self.user_translation)}")  # Диагностика
+
+        # Добавляем выбранное слово в перевод
+        self.user_translation.append(chosen_option)
+        self.completed_words += 1
+
+        # Обновляем клавиатуру или показываем результат
+        if self.completed_words < self.total_words_count:
+            # Ещё не выбрали все слова
+            self.options = self.generate_options()  # Новые варианты для следующего слова
+            keyboard = self.create_keyboard(self.options)
+            # Безопасно экранируем текст перед отправкой
+            safe_message = GrammarLearner.escape_md_v2(f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                                        f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
+                                        f"Продолжайте выбирать!")
+            await query.message.edit_text(safe_message, reply_markup=keyboard, parse_mode="MarkdownV2")
+        else:
+            # Все слова выбраны, проверяем перевод
+            final_translation = ' '.join(self.user_translation).strip()
+            errors = self.find_errors(final_translation, self.current_sentence.translation_en)
+
+            result_message = GrammarLearner.escape_md_v2(
+                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+                f"Ваш перевод: `{final_translation}`\n\n"
+                f"Правильный перевод: `{self.current_sentence.translation_en}`\n\n"
+                f"Результат: {errors}"
+            )
+            await query.message.answer(result_message, parse_mode="MarkdownV2")
+
+            # Сбрасываем состояние игры
+            self.current_sentence = None
+            self.user_translation.clear()
+            self.completed_words = 0
+            self.options = None

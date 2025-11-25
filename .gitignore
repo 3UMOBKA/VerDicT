@@ -20,6 +20,15 @@ __pycache__/
 migrations/*.pyc
 migrations/pycache/
 
+xml/
+zalp.py
+parsers/
+obsidian/.obsidian/
+newfile.py
+db_layer/migrations/
+Models_DB.drawio
+alembic.ini
+
 # Временные файлы draw.io
 .*.drawio.*
 

@@ -234,7 +234,10 @@ def next_sentence(self) -> Optional[Sentence]:
     """
     Получение следующего предложения из базы данных.
     """
-    self.current_sentence = get_random_sentence()
+    if self.mode["lesson"]!=None:
+        self.current_sentence = get_random_sentence()
+    else:
+        get_random_sentence_by_lesson(self.mode["lesson"])
     return self.current_sentence
     
     

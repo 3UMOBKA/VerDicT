@@ -11,10 +11,10 @@
             "id": "7783f715377b7e0f",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "Новая вкладка"
+              "icon": "lucide-git-fork",
+              "title": "Граф"
             }
           }
         ]
@@ -179,6 +179,13 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "5a32a8055eb55a67",
-  "lastOpenFiles": []
+  "active": "7783f715377b7e0f",
+  "lastOpenFiles": [
+    "README.md",
+    "learning_modules/__pycache__/grammar.cpython-310.pyc.140284994721584",
+    "learning_modules/__pycache__/grammar.cpython-310.pyc.140500550145840",
+    "learning_modules/__pycache__/grammar.cpython-310.pyc.140092226098992",
+    "learning_modules/__pycache__/grammar.cpython-310.pyc.140350979266352",
+    "learning_modules/__pycache__/grammar.cpython-310.pyc.140481090885424"
+  ]
 }

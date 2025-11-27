@@ -57,8 +57,6 @@ async def learn_words_command(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Обычный режим", callback_data='wl_sd')],
         [InlineKeyboardButton(text="По уроку", callback_data='wl_st')],
-        [InlineKeyboardButton(text="Экзаменационные задания", callback_data='wl_se')],
-        [InlineKeyboardButton(text="Быстрое обучение", callback_data='wl_sf')],
     ])
     await message.answer("Выберите режим обучения:", reply_markup=keyboard)
 
@@ -76,42 +74,46 @@ async def process_word_learning_modes(call: CallbackQuery):
             await word_learner.start_default_mode(call.message)
         case 'st':  # Изучение по уроку
             if lesson is None:
-                await choose_lesson(call.message)  # Пользователь выбирает урок
+                await choose_lesson_wl(call.message)  # Пользователь выбирает урок
             else:
                 await word_learner.start_lesson_mode(call.message, int(lesson))
         case 'se':  # Экзаменационные задания
             await word_learner.start_exam_mode(call.message)
-        case 'sf':  # Быстрое обучение
-            await word_learner.fast_fill_mode(call.message)
         case _:
             await call.answer("Неверный выбор режима", show_alert=True)
 
 # Выбор урока
-async def choose_lesson(message: Message):
-    lessons_list = get_lessons_from_db()
-    keyboard = InlineKeyboardMarkup()
-    for lesson in lessons_list:
-        button_text = f"Урок {lesson.lesson_num}"
-        callback_data = f"wl_st_{lesson.number}"  # Подразумеваем callback для урока
-        keyboard.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+async def choose_lesson_wl(message: Message):
+    lessons_list = await get_lessons_from_db()  # Получаем уникальный список уроков
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Урок {lesson[0]}", callback_data=f"wl_st_{lesson[0]}")] for lesson in lessons_list
+    ])  # Каждую кнопку помещаем в отдельный список
     await message.answer("Выберите урок:", reply_markup=keyboard)
 
 # Обработчик колбеков для выбора ответа
-@router.callback_query(lambda call: call.data.startswith('answer_'))
+@router.callback_query(lambda call: call.data.startswith('answer_wl_'))
 async def process_user_answers(call: CallbackQuery):
-    option_idx = int(call.data.split('_')[1])
+    option_idx = int(call.data.split('_')[2])
     selected_answer = word_learner.options[option_idx]
     is_correct = word_learner.check_answer(selected_answer)
-
+    mode = call.data.split('_')[3]
     if is_correct:
-        await call.answer("Правильно! Молодец!", show_alert=True)
+        await call.answer("Правильно! Молодец!")
     else:
         correct_answer = word_learner.current_word.english_word if word_learner.translation_direction == "ru->en" else word_learner.current_word.russian_word
-        await call.answer(f"Неправильно. Правильный ответ: {correct_answer}", show_alert=True)
+        await call.answer(f"Неправильно. Правильный ответ: {correct_answer}")
+    match mode:
+        case "lesson":
+            await word_learner.start_lesson_mode(call.message, call.data.split('_')[4])
+        case "default":
+            await word_learner.start_default_mode(call.message)
+        case "exam":
+            pass
+        
 
 # === Новое: обработка грамматического режима ===
 # Обработчик для выбора урока
-async def choose_lesson(message: Message):
+async def choose_lesson_gl(message: Message):
     lessons_list = await get_lessons_from_db()  # Получаем уникальный список уроков
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"Урок {lesson[0]}", callback_data=f"gl_st_{lesson[0]}")] for lesson in lessons_list
@@ -133,7 +135,7 @@ async def process_grammar_learning_modes(call: CallbackQuery):
             await grammar_learner.start_default_mode(call.message)  # Без await, если метод синхронный
         case 'st':  # Изучение по уроку
             if lesson is None:
-                await choose_lesson(call.message)  # Этот метод асинхронный
+                await choose_lesson_gl(call.message)  # Этот метод асинхронный
             else:
                 await grammar_learner.start_lesson_mode(call.message, int(lesson))  # Нужен await
         case 'se':  # Экзаменационный режим
@@ -151,7 +153,6 @@ async def grammar_command(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Обычный режим", callback_data='gl_sd')],
         [InlineKeyboardButton(text="По уроку", callback_data='gl_st')],
-        [InlineKeyboardButton(text="Экзаменационные задания", callback_data='gl_se')]
     ])
     await message.answer("Выберите режим обучения грамматики:", reply_markup=keyboard)
 

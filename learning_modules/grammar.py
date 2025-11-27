@@ -3,7 +3,7 @@ import random
 import re
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.types import Message, CallbackQuery
-from db_layer.repository import get_sentences_by_lesson, next_sentence, get_random_words
+from db_layer.repository import next_sentence, get_random_words
 
 
 class GrammarLearner:
@@ -80,19 +80,19 @@ class GrammarLearner:
     
         return '\n'.join(errors) if errors else "Нет ошибок!"
 
+    def escape_md_v2(text: str) -> str:
+        special_chars = r'_*\[]()~`>#+-={}|.!'
+        for ch in special_chars:
+            text = text.replace(ch, f'\\{ch}')
+        return text
+
+
     async def load_next_question(self, message: Message):
         """
         Загрузка следующего вопроса независимо от режима.
         """
         # Получаем следующее предложение
-        if self.mode.startswith("lesson:"):
-            # Учебный режим: берем предложение из указанного урока
-            lesson_id = int(self.mode.split(":")[1])
-            self.current_sentence = get_sentences_by_lesson(self, lesson_id)
-        else:
-            # Обычный или экзаменационный режим: получаем любое предложение
-            self.current_sentence = next_sentence(self)
-
+        self.current_sentence = next_sentence(self)
         if self.current_sentence:
             self.total_words_count = len(self.current_sentence.translation_en.split())  # Всего слов в переводе
             self.user_translation = []  # Очищаем накопленный перевод
@@ -134,19 +134,16 @@ class GrammarLearner:
             # Ещё не выбрали все слова
             self.options = self.generate_options()  # Новые варианты для следующего слова
             keyboard = self.create_keyboard(self.options)
-            await query.message.edit_text(
-                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
+            safe_message = GrammarLearner.escape_md_v2(f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
                 f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
-                f"Продолжайте выбирать!",
-                reply_markup=keyboard,
-                parse_mode="MarkdownV2"
-            )
+                f"Продолжайте выбирать!")
+            await query.message.edit_text(safe_message, reply_markup=keyboard, parse_mode="MarkdownV2")
         else:
             # Все слова выбраны, проверяем перевод
             final_translation = ' '.join(self.user_translation).strip()
             errors = self.find_errors(final_translation, self.current_sentence.translation_en)
 
-            result_message = (
+            result_message = GrammarLearner.escape_md_v2(
                 f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
                 f"Ваш перевод: `{final_translation}`\n\n"
                 f"Правильный перевод: `{self.current_sentence.translation_en}`\n\n"
@@ -156,13 +153,12 @@ class GrammarLearner:
 
             # Дальше грузим следующее задание или останавливаемся
             if self.mode.startswith("exam"):
-                # Экзаменационный режим — останов после завершения задания
                 self.current_sentence = None
                 self.user_translation.clear()
                 self.completed_words = 0
                 self.options = None
+                
             else:
-                # Обычный или учебный режим — начинаем следующее задание
                 await self.load_next_question(query.message)
     async def start_default_mode(self, message: Message):
         """
@@ -188,75 +184,3 @@ class GrammarLearner:
         self.mode = f"exam:{exam_level}"  # Добавляем уровень экзамена в режим
         await self.load_next_question(message)
 
-    async def load_next_question(self, message: Message):
-        """
-        Загрузка следующего вопроса независимо от режима.
-        """
-        # Получаем следующее предложение
-        self.current_sentence = next_sentence(self)
-        if self.current_sentence:
-            self.total_words_count = len(self.current_sentence.translation_en.split())  # Всего слов в переводе
-            self.user_translation = []  # Очищаем накопленный перевод
-            self.completed_words = 0  # Счётчик переведённых слов
-            self.options = self.generate_options()  # Первоначальные варианты ответов
-
-            # Первая итерация: показываем клавиатуру
-            keyboard = self.create_keyboard(self.options)
-            await message.answer(
-                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
-                f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
-                f"Выбирайте следующую часть перевода:",
-                reply_markup=keyboard,
-                parse_mode="MarkdownV2"
-            )
-        else:
-            await message.answer("Нет предложений для перевода.")
-
-    def escape_md_v2(text: str) -> str:
-        special_chars = r'_*\[]()~`>#+-={}|.!'
-        for ch in special_chars:
-            text = text.replace(ch, f'\\{ch}')
-        return text
-    async def handle_callback(self, query: CallbackQuery):
-        data_parts = query.data.split('_')
-        if len(data_parts) != 2 or data_parts[0] != 'gw':
-            raise ValueError('Некорректный формат callback-data.')
-
-        option_idx = int(data_parts[1])
-
-        # Получаем выбранный вариант ответа
-        chosen_option = self.options[option_idx]
-        print(f"Selected Option: {chosen_option}, Current Translation: {' '.join(self.user_translation)}")  # Диагностика
-
-        # Добавляем выбранное слово в перевод
-        self.user_translation.append(chosen_option)
-        self.completed_words += 1
-
-        # Обновляем клавиатуру или показываем результат
-        if self.completed_words < self.total_words_count:
-            # Ещё не выбрали все слова
-            self.options = self.generate_options()  # Новые варианты для следующего слова
-            keyboard = self.create_keyboard(self.options)
-            # Безопасно экранируем текст перед отправкой
-            safe_message = GrammarLearner.escape_md_v2(f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
-                                        f"Текущий перевод: {' '.join(self.user_translation)}\n\n"
-                                        f"Продолжайте выбирать!")
-            await query.message.edit_text(safe_message, reply_markup=keyboard, parse_mode="MarkdownV2")
-        else:
-            # Все слова выбраны, проверяем перевод
-            final_translation = ' '.join(self.user_translation).strip()
-            errors = self.find_errors(final_translation, self.current_sentence.translation_en)
-
-            result_message = GrammarLearner.escape_md_v2(
-                f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
-                f"Ваш перевод: `{final_translation}`\n\n"
-                f"Правильный перевод: `{self.current_sentence.translation_en}`\n\n"
-                f"Результат: {errors}"
-            )
-            await query.message.answer(result_message, parse_mode="MarkdownV2")
-
-            # Сбрасываем состояние игры
-            self.current_sentence = None
-            self.user_translation.clear()
-            self.completed_words = 0
-            self.options = None

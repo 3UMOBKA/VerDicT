@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 
 from db_layer.repository import (
     get_random_words, get_single_random_word, get_single_random_word_from_lesson,
-    add_or_update_metric_value, update_metric_value, search_records_by_word_pair, find_word_by_text
+    add_or_update_metric_value, find_word_by_text
 )
 
 logging.basicConfig(level=logging.DEBUG)
@@ -20,6 +20,8 @@ class WordLearner:
         self.current_word = None
         self.translation_direction = None
         self.options = None
+        self.mode = None
+        self.number = None
 
     def reset_game(self):
         """Сбрасываем игру для начала заново."""
@@ -131,17 +133,20 @@ class WordLearner:
         for i in range(0, len(options), 2):
             row_buttons = []
             for j in range(i, min(i+2, len(options))):
-                button = InlineKeyboardButton(text=options[j], callback_data=f"answer_{j}")
+                button = InlineKeyboardButton(text=options[j], callback_data=f"answer_wl_{j}_{self.mode}_{self.number}")
                 row_buttons.append(button)
             buttons.append(row_buttons)
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
         return keyboard
 
+        
+        
     async def start_default_mode(self, message: Message):
         """
         Старт стандартного режима игры со случайными словами.
         """
         self.reset_game()
+        self.mode = "default"
         task = self.get_current_task()
         if task is None:
             await message.answer("Нет слов для изучения.")
@@ -155,12 +160,15 @@ class WordLearner:
             reply_markup=keyboard,
             parse_mode="HTML",
         )
+        
 
     async def start_lesson_mode(self, message: Message, lesson_num: int):
         """
         Запуск учебного режима по указанному уроку.
         """
         self.reset_game()
+        self.mode = "lesson"
+        self.number = lesson_num
         task = self.get_current_task(lesson_num)
         if task is None:
             await message.answer("Нет слов для изучаемого урока.")
@@ -193,3 +201,5 @@ class WordLearner:
             reply_markup=keyboard,
             parse_mode="HTML",
         )
+        
+

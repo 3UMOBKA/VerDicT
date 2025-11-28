@@ -61,8 +61,8 @@ class CallbackLessons:
                 prev_page = None
         if prev_page is not None:
             navigation_buttons.append([InlineKeyboardButton(text="<< Предыдущая страница", callback_data=f"page_{prev_page.id}")])
-            navigation_buttons.append([InlineKeyboardButton(text="Задание", callback_data=f"wl_st_{lesson.num_lesson}")])
-        
+        navigation_buttons.append([InlineKeyboardButton(text="Тренировка лексики", callback_data=f"wl_st_{lesson.num_lesson}")])
+        navigation_buttons.append([InlineKeyboardButton(text="Тренировка грамматики", callback_data=f"gl_st_{lesson.num_lesson}")])
         # Кнопка Следующая страница
         if lesson.num_page < total_pages - 1:
             next_page = all_pages[lesson.num_page + 1]

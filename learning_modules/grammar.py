@@ -86,7 +86,6 @@ class GrammarLearner:
             text = text.replace(ch, f'\\{ch}')
         return text
 
-
     async def load_next_question(self, message: Message):
         """
         Загрузка следующего вопроса независимо от режима.
@@ -94,12 +93,12 @@ class GrammarLearner:
         # Получаем следующее предложение
         self.current_sentence = next_sentence(self)
         if self.current_sentence:
-            self.total_words_count = len(self.current_sentence.translation_en.split())  # Всего слов в переводе
-            self.user_translation = []  # Очищаем накопленный перевод
-            self.completed_words = 0  # Счётчик переведённых слов
-            self.options = self.generate_options()  # Первоначальные варианты ответов
+            self.total_words_count = len(self.current_sentence.translation_en.split())
+            self.user_translation = []
+            self.completed_words = 0
+            self.options = self.generate_options()
 
-            # Первая итерация: показываем клавиатуру
+            # Показываем клавиатуру с вариантами переводов
             keyboard = self.create_keyboard(self.options)
             await message.answer(
                 f"Исходное предложение: `{self.current_sentence.text_ru}`\n\n"
@@ -110,7 +109,8 @@ class GrammarLearner:
             )
         else:
             await message.answer("Нет предложений для перевода.")
-
+            
+        
     async def handle_callback(self, query: CallbackQuery):
         """
         Обработчик нажатий на inline-кнопки.
@@ -164,7 +164,7 @@ class GrammarLearner:
         """
         Стандартный режим игры.
         """
-        await message.answer("Начало стандартного режима.", reply_markup=ReplyKeyboardRemove())
+        await message.answer("Начало стандартного режима.")
         self.mode = "default"
         await self.load_next_question(message)
 
@@ -172,15 +172,15 @@ class GrammarLearner:
         """
         Учебный режим с фокусом на конкретные уроки.
         """
-        await message.answer(f"Начало учебного режима по уроку №{lesson_id}.", reply_markup=ReplyKeyboardRemove())
-        self.mode = f"lesson:{lesson_id}"  # Добавляем номер урока в режим
+        await message.answer(f"Начало учебного режима по уроку №{lesson_id}.")
+        self.mode = f"lesson_{lesson_id}"  # Добавляем номер урока в режим
         await self.load_next_question(message)
 
     async def start_exam_mode(self, message: Message, exam_level: int):
         """
         Экзаменационный режим с повышенной нагрузкой.
         """
-        await message.answer(f"Начало экзаменационного режима на уровне {exam_level}.", reply_markup=ReplyKeyboardRemove())
+        await message.answer(f"Начало экзаменационного режима на уровне {exam_level}.")
         self.mode = f"exam:{exam_level}"  # Добавляем уровень экзамена в режим
         await self.load_next_question(message)
 

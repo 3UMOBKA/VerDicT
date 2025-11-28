@@ -1,3 +1,5 @@
+from asyncio.log import logger
+import logging
 from db_layer.models import MetricWordsValue, Pages, Sentence, SessionLocal, Word, Relation
 from sqlalchemy import select, func, update
 from typing import List, Optional
@@ -234,21 +236,30 @@ def next_sentence(self) -> Optional[Sentence]:
     """
     Получение следующего предложения из базы данных.
     """
-    if self.mode["lesson"]!=None:
-        self.current_sentence = get_random_sentence()
+    if self.mode.startswith("lesson"):
+        _, lesson_number = self.mode.split("_")  # Разделяем строку и получаем номер урока
+        return get_random_sentence_by_lesson(int(lesson_number))
     else:
-        get_random_sentence_by_lesson(self.mode["lesson"])
-    return self.current_sentence
+        return get_random_sentence()
     
     
     
+
 def get_random_sentence_by_lesson(lesson_id: int) -> Optional[Sentence]:
     """
     Получение случайного предложения из указанного урока.
     """
+    logger.info(f"Попытка извлечения предложения из урока {lesson_id}")
     with SessionLocal() as session:
-        result = session.query(Sentence).filter(Sentence.num_lesson == lesson_id).order_by(func.random()).first()
-        return result
+        # Запрашиваем предложение с указанным номером урока
+        sentences_query = session.query(Sentence).filter(Sentence.num_lesson == lesson_id)
+        
+        # Выбираем одно случайное предложение из результата запроса
+        random_sentence = sentences_query.order_by(func.random()).limit(1).first()
+            
+        return random_sentence
+
+        
 def get_sentences_by_lesson(lesson_id: int) -> List[Sentence]:
     """
     Получение всех предложений из указанного урока.
